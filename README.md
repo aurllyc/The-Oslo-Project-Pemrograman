@@ -1,6 +1,12 @@
+<div align="center">
+
+<img src="Image/Logo1.png" alt="The Oslo Project Logo" width="180"/>
+
 # The Oslo Project
 
 Sistem Informasi Manajemen Magang Terintegrasi berbasis web dan mobile-first yang dirancang untuk memfasilitasi proses pengajuan, monitoring, evaluasi, dan pengelolaan kegiatan magang mahasiswa secara real-time. Sistem mendukung kolaborasi antara mahasiswa, dosen pembimbing, program studi, dan mitra/perusahaan dalam satu platform terpusat.
+
+</div>
 
 ---
 
