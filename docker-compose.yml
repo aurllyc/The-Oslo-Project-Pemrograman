@@ -1,0 +1,56 @@
+version: '3.8'
+name: sistem-magang-be-${APP_ENV} # Nama project otomatis beda di tiap env
+
+services:
+  # Layanan 1: Laravel Application
+  app:
+    build:
+      context: .
+      target: ${DOCKER_TARGET_STAGE} # Mengambil stage dari .env (development / production)
+    container_name: magang-be-app-${APP_ENV}
+    restart: always
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - ./storage:/var/www/html/storage # Mencegah file unggahan mahasiswa hilang saat container restart
+    environment:
+      - APP_ENV=${APP_ENV}
+      - APP_KEY=${APP_KEY}
+      - DB_HOST=database
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      - database
+
+  # Layanan 2: Web Server (Nginx)
+  webserver:
+    image: nginx:alpine
+    container_name: magang-be-nginx-${APP_ENV}
+    restart: always
+    ports:
+      - "${APP_PORT}:80" # Port eksternal diatur dari .env
+    volumes:
+      - ./:/var/www/html
+      # Anda perlu membuat file nginx.conf sederhana untuk routing Laravel
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+
+  # Layanan 3: Database (MySQL)
+  database:
+    image: mysql:8.0
+    container_name: magang-be-db-${APP_ENV}
+    restart: always
+    ports:
+      - "${DB_PORT_EXTERNAL}:3306" # Agar bisa diremote via DBeaver/Navicat jika di dev
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - dbdata:/var/lib/mysql
+
+volumes:
+  dbdata: # Menyimpan data database asli agar tidak terhapus saat container mati

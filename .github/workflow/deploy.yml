@@ -1,0 +1,86 @@
+name: CI/CD Pipeline Sistem Magang Backend
+
+on:
+  push:
+    branches: [ "dev", "staging", "main" ]
+
+jobs:
+  # ==========================================
+  # STAGE 1: TESTING (Berlaku untuk semua branch)
+  # ==========================================
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.3'
+        extensions: mbstring, dom, fileinfo, zip
+        coverage: none
+
+    - name: Install Dependencies
+      run: composer install --prefer-dist --no-progress
+
+    - name: Execute Tests (Pest / PHPUnit)
+      run: php artisan test
+
+  # ==========================================
+  # STAGE 2: DEPLOY TO DEV / STAGING (Otomatis)
+  # ==========================================
+  deploy-dev-stg:
+    needs: test
+    if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy otomatis ke Server menggunakan SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: root
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          # Masuk ke folder aplikasi di server (sesuai branch)
+          if [ "${{ github.ref_name }}" = "dev" ]; then
+            cd /var/www/magang-be-dev
+          else
+            cd /var/www/magang-be-stg
+          fi
+
+          # Tarik kode terbaru, build docker, dan langsung bersihkan sampah
+          git pull origin ${{ github.ref_name }}
+          docker compose up -d --build
+          docker image prune -f
+
+  # ==========================================
+  # STAGE 3: DEPLOY TO PRODUCTION (Butuh Manual Approval)
+  # ==========================================
+  deploy-production:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Baris di bawah ini yang membuat tombol "Review / Approve" muncul di GitHub
+    environment: production
+    steps:
+    - name: Deploy Manual ke Server Production
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: root
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd /var/www/magang-be-production
+          git pull origin main
+
+          # Suntikkan .env Production dari GitHub Secrets
+          echo "${{ secrets.ENV_PRODUCTION }}" > .env
+
+          # Build & Jalankan Container Production
+          docker compose up -d --build
+
+          # Jalankan migrasi database di dalam container
+          docker compose exec -T app php artisan migrate --force
+
+          # Teknik Prune wajib untuk menjaga kapasitas server Prod
+          docker image prune -f
